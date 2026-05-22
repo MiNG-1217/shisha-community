@@ -1,19 +1,23 @@
 import { useState } from "react";
 import { auth } from "./firebase";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { useUser } from "./hooks/useUser";
 import Chat from "./Chat";
+import PollCreate from "./PollCreate";
+import PollVote from "./PollVote";
+import PollResult from "./PollResult";
 
 function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [user, setUser] = useState(null);
   const [page, setPage] = useState("dashboard");
+
+  const { user, userDoc, isAdmin, loading } = useUser();
 
   const handleLogin = async () => {
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      setUser(result.user);
+      await signInWithEmailAndPassword(auth, email, password);
       setError("");
     } catch (err) {
       setError("メールアドレスまたはパスワードが間違っています");
@@ -22,34 +26,55 @@ function App() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    setUser(null);
     setPage("dashboard");
   };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#c9a96e' }}>読み込み中...</p>
+      </div>
+    );
+  }
 
   if (user) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', color: 'white' }}>
         <div style={{ backgroundColor: '#16213e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ color: '#c9a96e', margin: 0 }}>🌿 Shisha Community</h2>
-          <button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>ログアウト</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {isAdmin && <span style={{ color: '#c9a96e', fontSize: 12, border: '1px solid #c9a96e', borderRadius: 6, padding: '2px 8px' }}>管理人</span>}
+            <button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>ログアウト</button>
+          </div>
         </div>
+
         <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333' }}>
-          {['dashboard', 'chat'].map((p) => (
-            <button key={p} onClick={() => setPage(p)} style={{
-              padding: '12px 24px',
-              backgroundColor: page === p ? '#c9a96e' : 'transparent',
-              color: page === p ? '#1a1a2e' : '#888',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}>
-              {p === 'dashboard' ? '🏠 ホーム' : '💬 チャット'}
-            </button>
+          {['dashboard', 'chat', 'pollvote', 'pollresult', 'poll'].map((p) => (
+            (p === 'dashboard' || p === 'chat' || p === 'pollvote' || isAdmin) && (
+              <button key={p} onClick={() => setPage(p)} style={{
+                padding: '12px 24px',
+                backgroundColor: page === p ? '#c9a96e' : 'transparent',
+                color: page === p ? '#1a1a2e' : '#888',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}>
+                {p === 'dashboard' ? '🏠 ホーム'
+                  : p === 'chat' ? '💬 チャット'
+                  : p === 'pollvote' ? '🗳️ 投票に参加'
+                  : p === 'pollresult' ? '📊 投票結果'
+                  : '✏️ 投票作成'}
+              </button>
+            )
           ))}
         </div>
+
         {page === 'dashboard' && (
           <div style={{ padding: '24px' }}>
             <h3 style={{ color: '#c9a96e' }}>ダッシュボード</h3>
+            <p style={{ color: '#888', marginBottom: 20 }}>
+              ようこそ、{userDoc?.nickname} さん
+            </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
               <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
                 <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>💬 チャット</h4>
@@ -71,6 +96,9 @@ function App() {
           </div>
         )}
         {page === 'chat' && <Chat />}
+        {page === 'pollvote' && <PollVote userDoc={userDoc} onBack={() => setPage('dashboard')} />}
+        {page === 'pollresult' && <PollResult userDoc={userDoc} onBack={() => setPage('dashboard')} />}
+        {page === 'poll' && <PollCreate userDoc={userDoc} onBack={() => setPage('dashboard')} />}
       </div>
     );
   }
