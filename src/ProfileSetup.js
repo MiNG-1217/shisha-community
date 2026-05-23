@@ -12,9 +12,35 @@ export default function ProfileSetup({ userDoc, onDone }) {
   const [workShop, setWorkShop] = useState("");
   const [isStaff, setIsStaff] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [iconFile, setIconFile] = useState(null);
+  const [iconPreview, setIconPreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleIconChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIconFile(file);
+    setIconPreview(URL.createObjectURL(file));
+  };
+
+  const uploadIcon = async () => {
+    if (!iconFile) return null;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", iconFile);
+    formData.append("upload_preset", process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET);
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: "POST", body: formData }
+    );
+    const data = await res.json();
+    setUploading(false);
+    return data.secure_url;
+  };
 
   const handleSave = async () => {
     setSaving(true);
+    const iconUrl = await uploadIcon();
     await updateDoc(doc(db, "users", userDoc.uid), {
       threads,
       area,
@@ -25,6 +51,7 @@ export default function ProfileSetup({ userDoc, onDone }) {
       workShop: isStaff ? workShop : "",
       isStaff,
       profileDone: true,
+      ...(iconUrl && { iconUrl }),
     });
     setSaving(false);
     onDone();
@@ -35,6 +62,19 @@ export default function ProfileSetup({ userDoc, onDone }) {
       <div style={styles.box}>
         <h2 style={styles.title}>🌿 プロフィール設定</h2>
         <p style={styles.sub}>あとで変更できます</p>
+
+        {/* アイコン画像 */}
+        <div style={styles.iconWrap}>
+          {iconPreview ? (
+            <img src={iconPreview} alt="icon" style={styles.iconImg} />
+          ) : (
+            <div style={styles.iconPlaceholder}>📷</div>
+          )}
+          <label style={styles.iconBtn}>
+            画像を選ぶ
+            <input type="file" accept="image/*" onChange={handleIconChange} style={{ display: "none" }} />
+          </label>
+        </div>
 
         <label style={styles.label}>Threadsアカウント</label>
         <input style={styles.input} placeholder="@username" value={threads} onChange={(e) => setThreads(e.target.value)} />
@@ -66,8 +106,8 @@ export default function ProfileSetup({ userDoc, onDone }) {
           </>
         )}
 
-        <button style={styles.btn} onClick={handleSave} disabled={saving}>
-          {saving ? "保存中..." : "保存して始める"}
+        <button style={styles.btn} onClick={handleSave} disabled={saving || uploading}>
+          {uploading ? "画像アップロード中..." : saving ? "保存中..." : "保存して始める"}
         </button>
 
         <button style={styles.skipBtn} onClick={onDone}>スキップ</button>
@@ -88,6 +128,17 @@ const styles = {
   },
   title: { color: "#c9a96e", marginBottom: 4, textAlign: "center" },
   sub: { color: "#888", marginBottom: 24, textAlign: "center" },
+  iconWrap: { display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 8 },
+  iconImg: { width: 90, height: 90, borderRadius: "50%", objectFit: "cover", marginBottom: 8 },
+  iconPlaceholder: {
+    width: 90, height: 90, borderRadius: "50%", backgroundColor: "#0f3460",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 32, marginBottom: 8,
+  },
+  iconBtn: {
+    padding: "6px 16px", backgroundColor: "#0f3460", color: "#c9a96e",
+    borderRadius: 8, cursor: "pointer", fontSize: 14, border: "1px solid #c9a96e",
+  },
   label: { display: "block", color: "#aaa", marginBottom: 6, marginTop: 16, fontSize: 14 },
   input: {
     width: "100%", padding: 12, borderRadius: 8,
