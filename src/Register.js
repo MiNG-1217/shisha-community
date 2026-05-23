@@ -1,109 +1,151 @@
 import { useState } from "react";
-import { auth, db } from "./firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
+import { auth } from "./firebase";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { useUser } from "./hooks/useUser";
+import Chat from "./Chat";
+import PollCreate from "./PollCreate";
+import PollVote from "./PollVote";
+import PollResult from "./PollResult";
+import EventList from "./EventList";
+import InviteAdmin from "./InviteAdmin";
+import Register from "./Register";
+import ProfileSetup from "./ProfileSetup";
 
-export default function Register({ inviteCode, onDone }) {
+function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState("dashboard");
+  const { user, userDoc, isAdmin, loading } = useUser();
 
-  const handleRegister = async () => {
-    if (!email.trim() || !password.trim() || !nickname.trim()) {
-      setError("全て入力してください");
-      return;
-    }
-    if (password.length < 6) {
-      setError("パスワードは6文字以上にしてください");
-      return;
-    }
-    setLoading(true);
+  const inviteCode = new URLSearchParams(window.location.search).get("invite");
+
+  const handleLogin = async () => {
     try {
-      const q = query(collection(db, "invites"), where("code", "==", inviteCode), where("used", "==", false));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        setError("招待URLが無効または使用済みです");
-        setLoading(false);
-        return;
-      }
-      const inviteDoc = snap.docs[0];
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, "users", result.user.uid), {
-        uid: result.user.uid,
-        email,
-        nickname,
-        role: "member",
-      });
-      await updateDoc(doc(db, "invites", inviteDoc.id), { used: true });
-      onDone();
-    } catch (e) {
-      if (e.code === "auth/email-already-in-use") {
-        setError("このメールアドレスは既に使われています");
-      } else {
-        setError("エラーが発生しました: " + e.message);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      setError("");
+    } catch (err) {
+      setError("メールアドレスまたはパスワードが間違っています");
     }
-    setLoading(false);
   };
 
-  return (
-    <div style={styles.wrap}>
-      <div style={styles.box}>
-        <h1 style={styles.title}>🌿 Shisha Community</h1>
-        <p style={styles.sub}>新規登録</p>
+  const handleLogout = async () => {
+    await signOut(auth);
+    setPage("dashboard");
+  };
 
-        <input
-          placeholder="ニックネーム"
-          value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
-          style={styles.input}
-        />
-        <input
-          type="email"
-          placeholder="メールアドレス"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={styles.input}
-        />
-        <input
-          type="password"
-          placeholder="パスワード（6文字以上）"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={styles.input}
-        />
-
-        {error && <p style={styles.error}>{error}</p>}
-
-        <button style={styles.btn} onClick={handleRegister} disabled={loading}>
-          {loading ? "登録中..." : "登録する"}
-        </button>
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#c9a96e' }}>読み込み中...</p>
       </div>
+    );
+  }
+
+  if (!user && inviteCode) {
+    return (
+      <Register
+        inviteCode={inviteCode}
+        onDone={() => window.location.href = "/"}
+      />
+    );
+  }
+
+  if (!user) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ backgroundColor: '#16213e', padding: '40px', borderRadius: '12px', width: '320px', textAlign: 'center' }}>
+          <h1 style={{ color: '#c9a96e', marginBottom: '8px' }}>🌿 Shisha Community</h1>
+          <p style={{ color: '#888', marginBottom: '24px' }}>ログイン</p>
+          <input type="email" placeholder="メールアドレス" value={email} onChange={(e) => setEmail(e.target.value)}
+            style={{ width: '100%', padding: '12px', marginBottom: '12px', borderRadius: '8px', border: '1px solid #333', backgroundColor: '#0f3460', color: 'white', boxSizing: 'border-box' }} />
+          <input type="password" placeholder="パスワード" value={password} onChange={(e) => setPassword(e.target.value)}
+            style={{ width: '100%', padding: '12px', marginBottom: '12px', borderRadius: '8px', border: '1px solid #333', backgroundColor: '#0f3460', color: 'white', boxSizing: 'border-box' }} />
+          {error && <p style={{ color: '#ff6b6b', marginBottom: '12px' }}>{error}</p>}
+          <button onClick={handleLogin}
+            style={{ width: '100%', padding: '12px', backgroundColor: '#c9a96e', color: '#1a1a2e', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
+            ログイン
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && userDoc && !userDoc.profileDone) {
+    return (
+      <ProfileSetup
+        userDoc={userDoc}
+        onDone={() => window.location.href = "/"}
+      />
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', color: 'white' }}>
+      <div style={{ backgroundColor: '#16213e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={{ color: '#c9a96e', margin: 0 }}>🌿 Shisha Community</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {isAdmin && <span style={{ color: '#c9a96e', fontSize: 12, border: '1px solid #c9a96e', borderRadius: 6, padding: '2px 8px' }}>管理人</span>}
+          <button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>ログアウト</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
+        {['dashboard', 'chat', 'events', 'pollvote', 'pollresult', 'poll', 'invite'].map((p) => (
+          (p === 'dashboard' || p === 'chat' || p === 'events' || p === 'pollvote' || isAdmin) && (
+            <button key={p} onClick={() => setPage(p)} style={{
+              padding: '12px 20px',
+              backgroundColor: page === p ? '#c9a96e' : 'transparent',
+              color: page === p ? '#1a1a2e' : '#888',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: 13,
+            }}>
+              {p === 'dashboard' ? '🏠 ホーム'
+                : p === 'chat' ? '💬 チャット'
+                : p === 'events' ? '📅 イベント'
+                : p === 'pollvote' ? '🗳️ 投票'
+                : p === 'pollresult' ? '📊 投票結果'
+                : p === 'poll' ? '✏️ 投票作成'
+                : '🔗 招待'}
+            </button>
+          )
+        ))}
+      </div>
+
+      {page === 'dashboard' && (
+        <div style={{ padding: '24px' }}>
+          <h3 style={{ color: '#c9a96e' }}>ダッシュボード</h3>
+          <p style={{ color: '#888', marginBottom: 20 }}>ようこそ、{userDoc?.nickname} さん</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
+              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>💬 チャット</h4>
+              <p style={{ color: '#888', margin: 0 }}>未読メッセージなし</p>
+            </div>
+            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
+              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>📅 直近イベント</h4>
+              <p style={{ color: '#888', margin: 0 }}>イベントなし</p>
+            </div>
+            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
+              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>🗳️ 投票</h4>
+              <p style={{ color: '#888', margin: 0 }}>進行中の投票なし</p>
+            </div>
+            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
+              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>📣 お知らせ</h4>
+              <p style={{ color: '#888', margin: 0 }}>新着なし</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {page === 'chat' && <Chat />}
+      {page === 'events' && <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />}
+      {page === 'pollvote' && <PollVote userDoc={userDoc} onBack={() => setPage('dashboard')} />}
+      {page === 'pollresult' && <PollResult userDoc={userDoc} onBack={() => setPage('dashboard')} />}
+      {page === 'poll' && <PollCreate userDoc={userDoc} onBack={() => setPage('dashboard')} />}
+      {page === 'invite' && <InviteAdmin onBack={() => setPage('dashboard')} />}
     </div>
   );
 }
 
-const styles = {
-  wrap: {
-    minHeight: "100vh", backgroundColor: "#1a1a2e",
-    display: "flex", alignItems: "center", justifyContent: "center",
-  },
-  box: {
-    backgroundColor: "#16213e", padding: 40, borderRadius: 12,
-    width: 320, textAlign: "center",
-  },
-  title: { color: "#c9a96e", marginBottom: 8, fontSize: 22 },
-  sub: { color: "#888", marginBottom: 24 },
-  input: {
-    width: "100%", padding: 12, marginBottom: 12, borderRadius: 8,
-    border: "1px solid #333", backgroundColor: "#0f3460", color: "white",
-    boxSizing: "border-box", fontSize: 15,
-  },
-  error: { color: "#ff6b6b", marginBottom: 12 },
-  btn: {
-    width: "100%", padding: 12, backgroundColor: "#c9a96e", color: "#1a1a2e",
-    border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 16, cursor: "pointer",
-  },
-};
+export default App;

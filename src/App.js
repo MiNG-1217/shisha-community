@@ -9,6 +9,7 @@ import PollResult from "./PollResult";
 import EventList from "./EventList";
 import InviteAdmin from "./InviteAdmin";
 import Register from "./Register";
+import ProfileSetup from "./ProfileSetup";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -42,12 +43,7 @@ function App() {
   }
 
   if (!user && inviteCode) {
-    return (
-      <Register
-        inviteCode={inviteCode}
-        onDone={() => window.location.href = "/"}
-      />
-    );
+    return <Register inviteCode={inviteCode} onDone={() => window.location.href = "/"} />;
   }
 
   if (!user) {
@@ -68,6 +64,10 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  if (user && userDoc && userDoc.profileDone === false) {
+    return <ProfileSetup userDoc={userDoc} onDone={() => window.location.href = "/"} />;
   }
 
   return (
