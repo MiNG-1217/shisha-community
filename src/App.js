@@ -7,6 +7,8 @@ import PollCreate from "./PollCreate";
 import PollVote from "./PollVote";
 import PollResult from "./PollResult";
 import EventList from "./EventList";
+import InviteAdmin from "./InviteAdmin";
+import Register from "./Register";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -14,6 +16,8 @@ function App() {
   const [error, setError] = useState("");
   const [page, setPage] = useState("dashboard");
   const { user, userDoc, isAdmin, loading } = useUser();
+
+  const inviteCode = new URLSearchParams(window.location.search).get("invite");
 
   const handleLogin = async () => {
     try {
@@ -34,6 +38,15 @@ function App() {
       <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: '#c9a96e' }}>読み込み中...</p>
       </div>
+    );
+  }
+
+  if (!user && inviteCode) {
+    return (
+      <Register
+        inviteCode={inviteCode}
+        onDone={() => window.location.href = "/"}
+      />
     );
   }
 
@@ -68,7 +81,7 @@ function App() {
       </div>
 
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
-        {['dashboard', 'chat', 'events', 'pollvote', 'pollresult', 'poll'].map((p) => (
+        {['dashboard', 'chat', 'events', 'pollvote', 'pollresult', 'poll', 'invite'].map((p) => (
           (p === 'dashboard' || p === 'chat' || p === 'events' || p === 'pollvote' || isAdmin) && (
             <button key={p} onClick={() => setPage(p)} style={{
               padding: '12px 20px',
@@ -84,7 +97,8 @@ function App() {
                 : p === 'events' ? '📅 イベント'
                 : p === 'pollvote' ? '🗳️ 投票'
                 : p === 'pollresult' ? '📊 投票結果'
-                : '✏️ 投票作成'}
+                : p === 'poll' ? '✏️ 投票作成'
+                : '🔗 招待'}
             </button>
           )
         ))}
@@ -119,6 +133,7 @@ function App() {
       {page === 'pollvote' && <PollVote userDoc={userDoc} onBack={() => setPage('dashboard')} />}
       {page === 'pollresult' && <PollResult userDoc={userDoc} onBack={() => setPage('dashboard')} />}
       {page === 'poll' && <PollCreate userDoc={userDoc} onBack={() => setPage('dashboard')} />}
+      {page === 'invite' && <InviteAdmin onBack={() => setPage('dashboard')} />}
     </div>
   );
 }
