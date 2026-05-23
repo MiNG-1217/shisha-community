@@ -10,6 +10,7 @@ import EventList from "./EventList";
 import InviteAdmin from "./InviteAdmin";
 import Register from "./Register";
 import ProfileSetup from "./ProfileSetup";
+import ProfileList from "./ProfileList";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -81,8 +82,8 @@ function App() {
       </div>
 
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
-        {['dashboard', 'chat', 'events', 'pollvote', 'pollresult', 'poll', 'invite'].map((p) => (
-          (p === 'dashboard' || p === 'chat' || p === 'events' || p === 'pollvote' || isAdmin) && (
+        {['dashboard', 'chat', 'events', 'members', 'pollvote', 'pollresult', 'poll', 'invite'].map((p) => (
+          (p === 'dashboard' || p === 'chat' || p === 'events' || p === 'members' || p === 'pollvote' || isAdmin) && (
             <button key={p} onClick={() => setPage(p)} style={{
               padding: '12px 20px',
               backgroundColor: page === p ? '#c9a96e' : 'transparent',
@@ -95,6 +96,7 @@ function App() {
               {p === 'dashboard' ? '🏠 ホーム'
                 : p === 'chat' ? '💬 チャット'
                 : p === 'events' ? '📅 イベント'
+                : p === 'members' ? '👥 メンバー'
                 : p === 'pollvote' ? '🗳️ 投票'
                 : p === 'pollresult' ? '📊 投票結果'
                 : p === 'poll' ? '✏️ 投票作成'
@@ -130,6 +132,7 @@ function App() {
       )}
       {page === 'chat' && <Chat />}
       {page === 'events' && <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />}
+      {page === 'members' && <ProfileList userDoc={userDoc} onBack={() => setPage('dashboard')} />}
       {page === 'pollvote' && <PollVote userDoc={userDoc} onBack={() => setPage('dashboard')} />}
       {page === 'pollresult' && <PollResult userDoc={userDoc} onBack={() => setPage('dashboard')} />}
       {page === 'poll' && <PollCreate userDoc={userDoc} onBack={() => setPage('dashboard')} />}
