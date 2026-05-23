@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { useUser } from "./hooks/useUser";
 import Chat from "./Chat";
 import PollCreate from "./PollCreate";
@@ -13,6 +13,7 @@ import Register from "./Register";
 import ProfileSetup from "./ProfileSetup";
 import ProfileList from "./ProfileList";
 import MemberAdmin from "./MemberAdmin";
+import Notices from "./Notices";
 
 function App() {
   const [email, setEmail] = useState("");
@@ -20,23 +21,19 @@ function App() {
   const [error, setError] = useState("");
   const [page, setPage] = useState("dashboard");
   const [subPage, setSubPage] = useState(null);
-  const [events, setEvents] = useState([]);
+  const [notices, setNotices] = useState([]);
   const { user, userDoc, isAdmin, loading } = useUser();
 
   const inviteCode = new URLSearchParams(window.location.search).get("invite");
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(collection(db, "events"), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setEvents(list);
+    const q = query(collection(db, "notices"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setNotices(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   }, [user]);
-
-  const myEvents = events.filter(
-    (e) => e.attendees?.[user?.uid] === "going"
-  ).sort((a, b) => (a.date > b.date ? 1 : -1));
 
   const handleLogin = async () => {
     try {
@@ -89,102 +86,77 @@ function App() {
     return <ProfileSetup userDoc={userDoc} onDone={() => window.location.href = "/"} />;
   }
 
+  const formatDate = (ts) => {
+    if (!ts || !ts.toDate) return "";
+    const d = ts.toDate();
+    return (d.getMonth() + 1) + "/" + d.getDate();
+  };
+
   const renderPage = () => {
     if (page === 'dashboard') {
       return (
         <div style={{ padding: '24px' }}>
-          <h3 style={{ color: '#c9a96e' }}>ダッシュボード</h3>
-          <p style={{ color: '#888', marginBottom: 20 }}>ようこそ、{userDoc?.nickname} さん</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
-            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
-              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>💬 チャット</h4>
-              <p style={{ color: '#888', margin: 0 }}>未読メッセージなし</p>
-            </div>
-            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
-              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>📅 直近イベント</h4>
-              {myEvents.length === 0 ? (
-                <p style={{ color: '#888', margin: 0 }}>参加予定なし</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ color: '#c9a96e', margin: 0 }}>お知らせ</h3>
+            {isAdmin && subPage !== 'noticepost' && (
+              <button
+                style={{ background: '#c9a96e', border: 'none', color: '#1a1a2e', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}
+                onClick={() => setSubPage('noticepost')}
+              >
+                投稿
+              </button>
+            )}
+          </div>
+          {subPage === 'noticepost' && (
+            <Notices userDoc={userDoc} isAdmin={isAdmin} onBack={() => setSubPage(null)} />
+          )}
+          {subPage !== 'noticepost' && (
+            <div>
+              {notices.length === 0 ? (
+                <p style={{ color: '#888' }}>新着なし</p>
               ) : (
-                myEvents.slice(0, 2).map((e) => (
-                  <div key={e.id} style={{ marginBottom: 6 }}>
-                    <p style={{ color: '#fff', margin: 0, fontSize: 14, fontWeight: 'bold' }}>{e.title}</p>
-                    <p style={{ color: '#c9a96e', margin: 0, fontSize: 12 }}>{e.date}</p>
+                notices.map((n) => (
+                  <div key={n.id} style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '16px', marginBottom: 10, border: '1px solid #333' }}>
+                    <p style={{ color: '#fff', margin: '0 0 6px', fontSize: 14, lineHeight: 1.6 }}>{n.text}</p>
+                    <p style={{ color: '#888', margin: 0, fontSize: 12 }}>{formatDate(n.createdAt)}</p>
                   </div>
                 ))
               )}
             </div>
-            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
-              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>🗳️ 投票</h4>
-              <p style={{ color: '#888', margin: 0 }}>進行中の投票なし</p>
-            </div>
-            <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
-              <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>📣 お知らせ</h4>
-              <p style={{ color: '#888', margin: 0 }}>新着なし</p>
-            </div>
-          </div>
+          )}
         </div>
       );
     }
-
     if (page === 'chat') return <Chat />;
-
-    if (page === 'events') {
-      return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
-    }
-
+    if (page === 'events') return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
+    if (page === 'invite') return <InviteAdmin onBack={() => setPage('dashboard')} />;
     if (page === 'members') {
-      if (subPage === 'memberadmin') {
-        return <MemberAdmin onBack={() => setSubPage(null)} />;
-      }
+      if (subPage === 'memberadmin') return <MemberAdmin onBack={() => setSubPage(null)} />;
       return (
         <div>
           {isAdmin && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 24px 0' }}>
-              <button
-                style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}
-                onClick={() => setSubPage('memberadmin')}
-              >
-                管理
-              </button>
+              <button style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }} onClick={() => setSubPage('memberadmin')}>管理</button>
             </div>
           )}
           <ProfileList userDoc={userDoc} onBack={() => setPage('dashboard')} />
         </div>
       );
     }
-
     if (page === 'poll') {
-      if (subPage === 'pollcreate') {
-        return <PollCreate userDoc={userDoc} onBack={() => setSubPage(null)} />;
-      }
-      if (subPage === 'pollresult') {
-        return <PollResult userDoc={userDoc} onBack={() => setSubPage(null)} />;
-      }
+      if (subPage === 'pollcreate') return <PollCreate userDoc={userDoc} onBack={() => setSubPage(null)} />;
+      if (subPage === 'pollresult') return <PollResult userDoc={userDoc} onBack={() => setSubPage(null)} />;
       return (
         <div>
           {isAdmin && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 24px 0' }}>
-              <button
-                style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}
-                onClick={() => setSubPage('pollresult')}
-              >
-                結果
-              </button>
-              <button
-                style={{ background: '#c9a96e', border: 'none', color: '#1a1a2e', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}
-                onClick={() => setSubPage('pollcreate')}
-              >
-                作成
-              </button>
+              <button style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }} onClick={() => setSubPage('pollresult')}>結果</button>
+              <button style={{ background: '#c9a96e', border: 'none', color: '#1a1a2e', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }} onClick={() => setSubPage('pollcreate')}>作成</button>
             </div>
           )}
           <PollVote userDoc={userDoc} onBack={() => setPage('dashboard')} />
         </div>
       );
-    }
-
-    if (page === 'invite') {
-      return <InviteAdmin onBack={() => setPage('dashboard')} />;
     }
   };
 
@@ -197,7 +169,6 @@ function App() {
           <button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>ログアウト</button>
         </div>
       </div>
-
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
         {['dashboard', 'chat', 'events', 'members', 'poll', 'invite'].map((p) => (
           (p !== 'invite' || isAdmin) && (
@@ -205,10 +176,7 @@ function App() {
               padding: '12px 20px',
               backgroundColor: page === p ? '#c9a96e' : 'transparent',
               color: page === p ? '#1a1a2e' : '#888',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: 13,
+              border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 13,
             }}>
               {p === 'dashboard' ? '🏠 ホーム'
                 : p === 'chat' ? '💬 チャット'
@@ -220,7 +188,6 @@ function App() {
           )
         ))}
       </div>
-
       {renderPage()}
     </div>
   );

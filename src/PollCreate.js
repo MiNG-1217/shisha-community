@@ -30,13 +30,18 @@ export default function PollCreate({ userDoc, onBack }) {
       createdAt: serverTimestamp(),
       status: "open",
     });
+    await addDoc(collection(db, "notices"), {
+      text: `新しい投票が始まりました！「${title.trim()}」`,
+      type: "newPoll",
+      createdAt: serverTimestamp(),
+    });
     setSending(false);
     setDone(true);
   };
 
   if (done) return (
     <div style={styles.container}>
-      <p style={styles.successMsg}>✅ 投票を作成しました！</p>
+      <p style={styles.successMsg}>投票を作成しました！</p>
       <button style={styles.backBtn} onClick={onBack}>← 戻る</button>
     </div>
   );
@@ -87,10 +92,7 @@ const styles = {
     fontSize: 15, boxSizing: "border-box", marginBottom: 8,
   },
   optionRow: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 },
-  removeBtn: {
-    background: "none", border: "none", color: "#888",
-    fontSize: 18, cursor: "pointer", padding: "0 4px",
-  },
+  removeBtn: { background: "none", border: "none", color: "#888", fontSize: 18, cursor: "pointer", padding: "0 4px" },
   addBtn: {
     display: "block", marginTop: 4, marginBottom: 20,
     background: "none", border: "1px solid #555", color: "#aaa",
@@ -100,9 +102,6 @@ const styles = {
     width: "100%", padding: "12px 0", background: "#c9a96e", color: "#1a1a2e",
     border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16, cursor: "pointer",
   },
-  backBtn: {
-    display: "block", marginTop: 12, background: "none", border: "none",
-    color: "#888", cursor: "pointer", fontSize: 14,
-  },
+  backBtn: { display: "block", marginTop: 12, background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14 },
   successMsg: { color: "#c9a96e", fontSize: 18, marginBottom: 20 },
 };
