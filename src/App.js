@@ -19,6 +19,7 @@ function App() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [page, setPage] = useState("dashboard");
+  const [subPage, setSubPage] = useState(null);
   const [events, setEvents] = useState([]);
   const { user, userDoc, isAdmin, loading } = useUser();
 
@@ -35,7 +36,7 @@ function App() {
 
   const myEvents = events.filter(
     (e) => e.attendees?.[user?.uid] === "going"
-  ).sort((a, b) => a.date > b.date ? 1 : -1);
+  ).sort((a, b) => (a.date > b.date ? 1 : -1));
 
   const handleLogin = async () => {
     try {
@@ -49,6 +50,7 @@ function App() {
   const handleLogout = async () => {
     await signOut(auth);
     setPage("dashboard");
+    setSubPage(null);
   };
 
   if (loading) {
@@ -87,43 +89,9 @@ function App() {
     return <ProfileSetup userDoc={userDoc} onDone={() => window.location.href = "/"} />;
   }
 
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', color: 'white' }}>
-      <div style={{ backgroundColor: '#16213e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ color: '#c9a96e', margin: 0 }}>🌿 Shisha Community</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {isAdmin && <span style={{ color: '#c9a96e', fontSize: 12, border: '1px solid #c9a96e', borderRadius: 6, padding: '2px 8px' }}>管理人</span>}
-          <button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>ログアウト</button>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
-        {['dashboard', 'chat', 'events', 'members', 'pollvote', 'pollresult', 'poll', 'invite', 'memberadmin'].map((p) => (
-          (p === 'dashboard' || p === 'chat' || p === 'events' || p === 'members' || p === 'pollvote' || isAdmin) && (
-            <button key={p} onClick={() => setPage(p)} style={{
-              padding: '12px 20px',
-              backgroundColor: page === p ? '#c9a96e' : 'transparent',
-              color: page === p ? '#1a1a2e' : '#888',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: 13,
-            }}>
-              {p === 'dashboard' ? '🏠 ホーム'
-                : p === 'chat' ? '💬 チャット'
-                : p === 'events' ? '📅 イベント'
-                : p === 'members' ? '👥 メンバー'
-                : p === 'pollvote' ? '🗳️ 投票'
-                : p === 'pollresult' ? '📊 投票結果'
-                : p === 'poll' ? '✏️ 投票作成'
-                : p === 'invite' ? '🔗 招待'
-                : '⚙️ メンバー管理'}
-            </button>
-          )
-        ))}
-      </div>
-
-      {page === 'dashboard' && (
+  const renderPage = () => {
+    if (page === 'dashboard') {
+      return (
         <div style={{ padding: '24px' }}>
           <h3 style={{ color: '#c9a96e' }}>ダッシュボード</h3>
           <p style={{ color: '#888', marginBottom: 20 }}>ようこそ、{userDoc?.nickname} さん</p>
@@ -155,15 +123,105 @@ function App() {
             </div>
           </div>
         </div>
-      )}
-      {page === 'chat' && <Chat />}
-      {page === 'events' && <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />}
-      {page === 'members' && <ProfileList userDoc={userDoc} onBack={() => setPage('dashboard')} />}
-      {page === 'pollvote' && <PollVote userDoc={userDoc} onBack={() => setPage('dashboard')} />}
-      {page === 'pollresult' && <PollResult userDoc={userDoc} onBack={() => setPage('dashboard')} />}
-      {page === 'poll' && <PollCreate userDoc={userDoc} onBack={() => setPage('dashboard')} />}
-      {page === 'invite' && <InviteAdmin onBack={() => setPage('dashboard')} />}
-      {page === 'memberadmin' && <MemberAdmin onBack={() => setPage('dashboard')} />}
+      );
+    }
+
+    if (page === 'chat') return <Chat />;
+
+    if (page === 'events') {
+      return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
+    }
+
+    if (page === 'members') {
+      if (subPage === 'memberadmin') {
+        return <MemberAdmin onBack={() => setSubPage(null)} />;
+      }
+      return (
+        <div>
+          {isAdmin && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 24px 0' }}>
+              <button
+                style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}
+                onClick={() => setSubPage('memberadmin')}
+              >
+                管理
+              </button>
+            </div>
+          )}
+          <ProfileList userDoc={userDoc} onBack={() => setPage('dashboard')} />
+        </div>
+      );
+    }
+
+    if (page === 'poll') {
+      if (subPage === 'pollcreate') {
+        return <PollCreate userDoc={userDoc} onBack={() => setSubPage(null)} />;
+      }
+      if (subPage === 'pollresult') {
+        return <PollResult userDoc={userDoc} onBack={() => setSubPage(null)} />;
+      }
+      return (
+        <div>
+          {isAdmin && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 24px 0' }}>
+              <button
+                style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}
+                onClick={() => setSubPage('pollresult')}
+              >
+                結果
+              </button>
+              <button
+                style={{ background: '#c9a96e', border: 'none', color: '#1a1a2e', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}
+                onClick={() => setSubPage('pollcreate')}
+              >
+                作成
+              </button>
+            </div>
+          )}
+          <PollVote userDoc={userDoc} onBack={() => setPage('dashboard')} />
+        </div>
+      );
+    }
+
+    if (page === 'invite') {
+      return <InviteAdmin onBack={() => setPage('dashboard')} />;
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', color: 'white' }}>
+      <div style={{ backgroundColor: '#16213e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={{ color: '#c9a96e', margin: 0 }}>🌿 Shisha Community</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {isAdmin && <span style={{ color: '#c9a96e', fontSize: 12, border: '1px solid #c9a96e', borderRadius: 6, padding: '2px 8px' }}>管理人</span>}
+          <button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>ログアウト</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
+        {['dashboard', 'chat', 'events', 'members', 'poll', 'invite'].map((p) => (
+          (p !== 'invite' || isAdmin) && (
+            <button key={p} onClick={() => { setPage(p); setSubPage(null); }} style={{
+              padding: '12px 20px',
+              backgroundColor: page === p ? '#c9a96e' : 'transparent',
+              color: page === p ? '#1a1a2e' : '#888',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: 13,
+            }}>
+              {p === 'dashboard' ? '🏠 ホーム'
+                : p === 'chat' ? '💬 チャット'
+                : p === 'events' ? '📅 イベント'
+                : p === 'members' ? '👥 メンバー'
+                : p === 'poll' ? '🗳️ 投票'
+                : '🔗 招待'}
+            </button>
+          )
+        ))}
+      </div>
+
+      {renderPage()}
     </div>
   );
 }
