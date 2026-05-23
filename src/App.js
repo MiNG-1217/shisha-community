@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { auth } from "./firebase";
+import { useState, useEffect } from "react";
+import { auth, db } from "./firebase";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { collection, onSnapshot } from "firebase/firestore";
 import { useUser } from "./hooks/useUser";
 import Chat from "./Chat";
 import PollCreate from "./PollCreate";
@@ -18,9 +19,23 @@ function App() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [page, setPage] = useState("dashboard");
+  const [events, setEvents] = useState([]);
   const { user, userDoc, isAdmin, loading } = useUser();
 
   const inviteCode = new URLSearchParams(window.location.search).get("invite");
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(collection(db, "events"), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setEvents(list);
+    });
+    return () => unsub();
+  }, [user]);
+
+  const myEvents = events.filter(
+    (e) => e.attendees?.[user?.uid] === "going"
+  ).sort((a, b) => a.date > b.date ? 1 : -1);
 
   const handleLogin = async () => {
     try {
@@ -119,7 +134,16 @@ function App() {
             </div>
             <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
               <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>📅 直近イベント</h4>
-              <p style={{ color: '#888', margin: 0 }}>イベントなし</p>
+              {myEvents.length === 0 ? (
+                <p style={{ color: '#888', margin: 0 }}>参加予定なし</p>
+              ) : (
+                myEvents.slice(0, 2).map((e) => (
+                  <div key={e.id} style={{ marginBottom: 6 }}>
+                    <p style={{ color: '#fff', margin: 0, fontSize: 14, fontWeight: 'bold' }}>{e.title}</p>
+                    <p style={{ color: '#c9a96e', margin: 0, fontSize: 12 }}>{e.date}</p>
+                  </div>
+                ))
+              )}
             </div>
             <div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '20px' }}>
               <h4 style={{ color: '#c9a96e', margin: '0 0 8px' }}>🗳️ 投票</h4>
