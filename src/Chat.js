@@ -1,20 +1,24 @@
 import { useState, useEffect } from "react";
 import { db, auth } from "./firebase";
-import { collection, addDoc, onSnapshot, orderBy, query, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, doc, setDoc } from "firebase/firestore";
 
-function Chat() {
+function Chat({ onUnreadChange }) {
   const [mode, setMode] = useState("group");
   const [messages, setMessages] = useState([]);
   const [dmMessages, setDmMessages] = useState([]);
   const [text, setText] = useState("");
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [unreadGroup, setUnreadGroup] = useState(0);
+  const [unreadDm, setUnreadDm] = useState({});
+
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
       const list = snap.docs
         .map((d) => d.data())
-        .filter((m) => m.uid !== auth.currentUser.uid);
+        .filter((m) => m.uid !== currentUser.uid);
       setMembers(list);
     });
     return () => unsub();
@@ -23,14 +27,43 @@ function Chat() {
   useEffect(() => {
     const q = query(collection(db, "messages"), orderBy("createdAt"));
     const unsub = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const msgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setMessages(msgs);
+      if (mode !== "group") {
+        const unread = msgs.filter(
+          (m) => m.uid !== currentUser.uid && !m.readBy?.includes(currentUser.uid)
+        ).length;
+        setUnreadGroup(unread);
+      } else {
+        setUnreadGroup(0);
+      }
     });
     return () => unsub();
-  }, []);
+  }, [mode]);
+
+  useEffect(() => {
+    members.forEach((member) => {
+      const dmId = [currentUser.uid, member.uid].sort().join("_");
+      const q = query(collection(db, "dms", dmId, "messages"), orderBy("createdAt"));
+      onSnapshot(q, (snapshot) => {
+        const msgs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const unread = msgs.filter(
+          (m) => m.uid !== currentUser.uid && !m.readBy?.includes(currentUser.uid)
+        ).length;
+        setUnreadDm((prev) => ({ ...prev, [member.uid]: unread }));
+      });
+    });
+  }, [members]);
+
+  useEffect(() => {
+    const totalDm = Object.values(unreadDm).reduce((a, b) => a + b, 0);
+    const total = unreadGroup + totalDm;
+    if (onUnreadChange) onUnreadChange(total);
+  }, [unreadGroup, unreadDm]);
 
   useEffect(() => {
     if (!selectedMember) return;
-    const dmId = [auth.currentUser.uid, selectedMember.uid].sort().join("_");
+    const dmId = [currentUser.uid, selectedMember.uid].sort().join("_");
     const q = query(collection(db, "dms", dmId, "messages"), orderBy("createdAt"));
     const unsub = onSnapshot(q, (snapshot) => {
       setDmMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
@@ -38,32 +71,55 @@ function Chat() {
     return () => unsub();
   }, [selectedMember]);
 
+  const markGroupRead = async () => {
+    messages.forEach(async (msg) => {
+      if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
+        await updateDoc(doc(db, "messages", msg.id), {
+          readBy: [...(msg.readBy || []), currentUser.uid],
+        });
+      }
+    });
+    setUnreadGroup(0);
+  };
+
+  const markDmRead = async (member) => {
+    const dmId = [currentUser.uid, member.uid].sort().join("_");
+    dmMessages.forEach(async (msg) => {
+      if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
+        await updateDoc(doc(db, "dms", dmId, "messages", msg.id), {
+          readBy: [...(msg.readBy || []), currentUser.uid],
+        });
+      }
+    });
+    setUnreadDm((prev) => ({ ...prev, [member.uid]: 0 }));
+  };
+
   const sendMessage = async () => {
     if (!text.trim()) return;
     if (mode === "group") {
       await addDoc(collection(db, "messages"), {
         text,
         createdAt: serverTimestamp(),
-        uid: auth.currentUser.uid,
-        email: auth.currentUser.email,
+        uid: currentUser.uid,
+        email: currentUser.email,
+        readBy: [currentUser.uid],
       });
     } else {
-      const dmId = [auth.currentUser.uid, selectedMember.uid].sort().join("_");
+      const dmId = [currentUser.uid, selectedMember.uid].sort().join("_");
       await addDoc(collection(db, "dms", dmId, "messages"), {
         text,
         createdAt: serverTimestamp(),
-        uid: auth.currentUser.uid,
-        email: auth.currentUser.email,
+        uid: currentUser.uid,
+        email: currentUser.email,
+        readBy: [currentUser.uid],
       });
     }
     setText("");
   };
-
-  const currentUser = auth.currentUser;
   if (mode === "dm" && selectedMember) {
     return (
       <div style={{ padding: "24px" }}>
-        <button onClick={() => { setMode("group"); setSelectedMember(null); }}
+        <button onClick={() => { setMode("dm"); setSelectedMember(null); }}
           style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>
           ← 戻る
         </button>
@@ -105,17 +161,32 @@ function Chat() {
       </div>
     );
   }
+
   return (
     <div style={{ padding: "24px" }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button onClick={() => setMode("group")} style={{
-          padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: "bold",
+        <button onClick={() => { setMode("group"); markGroupRead(); }} style={{
+          padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: "bold", position: "relative",
           backgroundColor: mode === "group" ? "#c9a96e" : "#16213e", color: mode === "group" ? "#1a1a2e" : "#888"
-        }}>💬 グループ</button>
+        }}>
+          💬 グループ
+          {unreadGroup > 0 && (
+            <span style={{ position: "absolute", top: -6, right: -6, background: "#ff4444", color: "white", borderRadius: "50%", width: 18, height: 18, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {unreadGroup}
+            </span>
+          )}
+        </button>
         <button onClick={() => setMode("dm")} style={{
-          padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: "bold",
+          padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: "bold", position: "relative",
           backgroundColor: mode === "dm" ? "#c9a96e" : "#16213e", color: mode === "dm" ? "#1a1a2e" : "#888"
-        }}>✉️ DM</button>
+        }}>
+          ✉️ DM
+          {Object.values(unreadDm).reduce((a, b) => a + b, 0) > 0 && (
+            <span style={{ position: "absolute", top: -6, right: -6, background: "#ff4444", color: "white", borderRadius: "50%", width: 18, height: 18, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {Object.values(unreadDm).reduce((a, b) => a + b, 0)}
+            </span>
+          )}
+        </button>
       </div>
 
       {mode === "group" && (
@@ -146,29 +217,3 @@ function Chat() {
               style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #333", backgroundColor: "#0f3460", color: "white" }} />
             <button onClick={sendMessage} style={{ padding: "12px 20px", backgroundColor: "#c9a96e", color: "#1a1a2e", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>送信</button>
           </div>
-        </div>
-      )}
-
-      {mode === "dm" && !selectedMember && (
-        <div>
-          <h3 style={{ color: "#c9a96e", marginBottom: 16 }}>✉️ DMする相手を選ぶ</h3>
-          {members.map((member) => (
-            <div key={member.uid} onClick={() => setSelectedMember(member)}
-              style={{ backgroundColor: "#16213e", borderRadius: 10, padding: 16, marginBottom: 10, cursor: "pointer", border: "1px solid #333", display: "flex", alignItems: "center", gap: 12 }}>
-              {member.iconUrl ? (
-                <img src={member.iconUrl} alt="icon" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
-              ) : (
-                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#c9a96e", color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 18 }}>
-                  {member.nickname?.[0] || "?"}
-                </div>
-              )}
-              <p style={{ color: "#fff", margin: 0, fontWeight: "bold" }}>{member.nickname}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default Chat;
