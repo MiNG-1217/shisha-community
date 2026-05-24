@@ -217,3 +217,4 @@ return (
     </div>
   );
 }
+export default Chat;
