@@ -4,22 +4,30 @@ import { collection, addDoc, onSnapshot, orderBy, query, serverTimestamp, update
 
 const AREAS = ["関西", "東海", "東北", "北海道", "九州"];
 
-function Chat({ onUnreadChange }) {
+function Chat({ onUnreadChange, userDoc }) {
 const [mode, setMode] = useState("group");
 const [messages, setMessages] = useState([]);
 const [dmMessages, setDmMessages] = useState([]);
 const [areaMessages, setAreaMessages] = useState([]);
 const [text, setText] = useState("");
 const [members, setMembers] = useState([]);
+const [allMembers, setAllMembers] = useState([]);
 const [selectedMember, setSelectedMember] = useState(null);
 const [selectedArea, setSelectedArea] = useState(null);
 const [unreadGroup, setUnreadGroup] = useState(0);
 const [unreadDm, setUnreadDm] = useState({});
 const currentUser = auth.currentUser;
 
+const getMemberInfo = (uid) => {
+const member = allMembers.find((m) => m.uid === uid);
+return { nickname: member?.nickname || "", iconUrl: member?.iconUrl || "" };
+};
+
 useEffect(() => {
 const unsub = onSnapshot(collection(db, "users"), (snap) => {
-const list = snap.docs.map((d) => d.data()).filter((m) => m.uid !== currentUser.uid);
+const all = snap.docs.map((d) => d.data());
+setAllMembers(all);
+const list = all.filter((m) => m.uid !== currentUser.uid);
 setMembers(list);
 });
 return () => unsub();
@@ -28,13 +36,16 @@ return () => unsub();
 useEffect(() => {
 const q = query(collection(db, "messages"), orderBy("createdAt"));
 const unsub = onSnapshot(q, (snapshot) => {
-const msgs = snapshot.docs.map((d) => ({ id: [d.id](http://d.id/), ...d.data() }));
+const msgs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 setMessages(msgs);
-if (mode !== "group") {
 const unread = msgs.filter((m) => m.uid !== currentUser.uid && !m.readBy?.includes(currentUser.uid)).length;
 setUnreadGroup(unread);
-} else {
-setUnreadGroup(0);
+if (mode === "group") {
+msgs.forEach(async (msg) => {
+if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
+await updateDoc(doc(db, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
+}
+});
 }
 });
 return () => unsub();
@@ -44,7 +55,7 @@ useEffect(() => {
 if (!selectedArea) return;
 const q = query(collection(db, "areas", selectedArea, "messages"), orderBy("createdAt"));
 const unsub = onSnapshot(q, (snapshot) => {
-setAreaMessages(snapshot.docs.map((d) => ({ id: [d.id](http://d.id/), ...d.data() })));
+setAreaMessages(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
 });
 return () => unsub();
 }, [selectedArea]);
@@ -54,7 +65,7 @@ members.forEach((member) => {
 const dmId = [currentUser.uid, member.uid].sort().join("_");
 const q = query(collection(db, "dms", dmId, "messages"), orderBy("createdAt"));
 onSnapshot(q, (snapshot) => {
-const msgs = snapshot.docs.map((d) => ({ id: [d.id](http://d.id/), ...d.data() }));
+const msgs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 const unread = msgs.filter((m) => m.uid !== currentUser.uid && !m.readBy?.includes(currentUser.uid)).length;
 setUnreadDm((prev) => ({ ...prev, [member.uid]: unread }));
 });
@@ -71,7 +82,19 @@ if (!selectedMember) return;
 const dmId = [currentUser.uid, selectedMember.uid].sort().join("_");
 const q = query(collection(db, "dms", dmId, "messages"), orderBy("createdAt"));
 const unsub = onSnapshot(q, (snapshot) => {
-setDmMessages(snapshot.docs.map((d) => ({ id: [d.id](http://d.id/), ...d.data() })));
+const msgs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+setDmMessages(msgs);
+msgs.forEach(async (msg) => {
+if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
+await updateDoc(doc(db, "dms", dmId, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
+}
+});
+setUnreadDm((prev) => {
+const updated = { ...prev, [selectedMember.uid]: 0 };
+const totalDm = Object.values(updated).reduce((a, b) => a + b, 0);
+if (onUnreadChange) onUnreadChange(unreadGroup + totalDm);
+return updated;
+});
 });
 return () => unsub();
 }, [selectedMember]);
@@ -79,7 +102,7 @@ return () => unsub();
 const markGroupRead = () => {
 messages.forEach(async (msg) => {
 if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
-await updateDoc(doc(db, "messages", [msg.id](http://msg.id/)), { readBy: [...(msg.readBy || []), currentUser.uid] });
+await updateDoc(doc(db, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
 }
 });
 setUnreadGroup(0);
@@ -89,7 +112,7 @@ const markDmRead = (member) => {
 const dmId = [currentUser.uid, member.uid].sort().join("_");
 dmMessages.forEach(async (msg) => {
 if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
-await updateDoc(doc(db, "dms", dmId, "messages", [msg.id](http://msg.id/)), { readBy: [...(msg.readBy || []), currentUser.uid] });
+await updateDoc(doc(db, "dms", dmId, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
 }
 });
 setUnreadDm((prev) => ({ ...prev, [member.uid]: 0 }));
@@ -98,12 +121,12 @@ setUnreadDm((prev) => ({ ...prev, [member.uid]: 0 }));
 const sendMessage = async () => {
 if (!text.trim()) return;
 if (mode === "group") {
-await addDoc(collection(db, "messages"), { text, createdAt: serverTimestamp(), uid: currentUser.uid, email: currentUser.email, readBy: [currentUser.uid] });
+await addDoc(collection(db, "messages"), { text, createdAt: serverTimestamp(), uid: currentUser.uid, email: currentUser.email, nickname: userDoc?.nickname || "", iconUrl: userDoc?.iconUrl || "", readBy: [currentUser.uid] });
 } else if (mode === "area" && selectedArea) {
-await addDoc(collection(db, "areas", selectedArea, "messages"), { text, createdAt: serverTimestamp(), uid: currentUser.uid, email: currentUser.email });
+await addDoc(collection(db, "areas", selectedArea, "messages"), { text, createdAt: serverTimestamp(), uid: currentUser.uid, email: currentUser.email, nickname: userDoc?.nickname || "", iconUrl: userDoc?.iconUrl || "" });
 } else {
 const dmId = [currentUser.uid, selectedMember.uid].sort().join("_");
-await addDoc(collection(db, "dms", dmId, "messages"), { text, createdAt: serverTimestamp(), uid: currentUser.uid, email: currentUser.email, readBy: [currentUser.uid] });
+await addDoc(collection(db, "dms", dmId, "messages"), { text, createdAt: serverTimestamp(), uid: currentUser.uid, email: currentUser.email, nickname: userDoc?.nickname || "", iconUrl: userDoc?.iconUrl || "", readBy: [currentUser.uid] });
 }
 setText("");
 };
@@ -123,9 +146,19 @@ return (
 <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
 {dmMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
 {dmMessages.map((msg) => (
-<div key={[msg.id](http://msg.id/)} style={{ marginBottom: "12px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>
-<div style={{ color: "#888", fontSize: "12px", marginBottom: "4px" }}>{msg.email}</div>
+<div key={msg.id} style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
+{msg.uid !== currentUser.uid && (
+selectedMember.iconUrl ? (
+<img src={selectedMember.iconUrl} alt="icon" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+) : (
+<div style={{ width: 32, height: 32, borderRadius: "50%", background: "#c9a96e", color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 13, flexShrink: 0 }}>{selectedMember.nickname?.[0] || "?"}</div>
+)
+)}
+<div>
+<div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && selectedMember.nickname}</div>
 <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
+{msg.uid === currentUser.uid && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{msg.readBy && msg.readBy.some((uid) => uid !== currentUser.uid) ? "既読" : ""}</div>}
+</div>
 </div>
 ))}
 </div>
@@ -145,9 +178,18 @@ return (
 <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
 {areaMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
 {areaMessages.map((msg) => (
-<div key={[msg.id](http://msg.id/)} style={{ marginBottom: "12px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>
-<div style={{ color: "#888", fontSize: "12px", marginBottom: "4px" }}>{msg.email}</div>
+<div key={msg.id} style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
+{msg.uid !== currentUser.uid && (
+getMemberInfo(msg.uid).iconUrl ? (
+<img src={getMemberInfo(msg.uid).iconUrl} alt="icon" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+) : (
+<div style={{ width: 32, height: 32, borderRadius: "50%", background: "#c9a96e", color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 13, flexShrink: 0 }}>{getMemberInfo(msg.uid).nickname?.[0] || "?"}</div>
+)
+)}
+<div>
+<div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && getMemberInfo(msg.uid).nickname}</div>
 <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
+</div>
 </div>
 ))}
 </div>
@@ -174,20 +216,25 @@ return (
 
 {mode === "group" && (
 <div>
-<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+<div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
 <h3 style={{ color: "#c9a96e", margin: 0 }}>💬 メインチャット</h3>
-<div style={{ display: "flex", gap: 6 }}>
-{AREAS.map((area) => (
-<button key={area} onClick={() => { setMode("area"); setSelectedArea(area); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #c9a96e", background: "none", color: "#c9a96e", cursor: "pointer", fontSize: 12 }}>{area}</button>
-))}
-</div>
+<button onClick={() => setMode("area")} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #c9a96e", background: "none", color: "#c9a96e", cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🗾 エリア</button>
 </div>
 <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
 {messages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
 {messages.map((msg) => (
-<div key={[msg.id](http://msg.id/)} style={{ marginBottom: "12px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>
-<div style={{ color: "#888", fontSize: "12px", marginBottom: "4px" }}>{msg.email}</div>
+<div key={msg.id} style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
+{msg.uid !== currentUser.uid && (
+getMemberInfo(msg.uid).iconUrl ? (
+<img src={getMemberInfo(msg.uid).iconUrl} alt="icon" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+) : (
+<div style={{ width: 32, height: 32, borderRadius: "50%", background: "#c9a96e", color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 13, flexShrink: 0 }}>{getMemberInfo(msg.uid).nickname?.[0] || "?"}</div>
+)
+)}
+<div>
+<div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && getMemberInfo(msg.uid).nickname}</div>
 <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
+</div>
 </div>
 ))}
 </div>
