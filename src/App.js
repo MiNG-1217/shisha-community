@@ -127,8 +127,7 @@ function App() {
         </div>
       );
     }
-    if (page === 'chat') return <Chat onUnreadChange={setChatUnread} />;
-    if (page === 'events') return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
+    if (page === 'chat') return <Chat onUnreadChange={setChatUnread} userDoc={userDoc} />;    if (page === 'events') return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
     if (page === 'invite') return <InviteAdmin onBack={() => setPage('dashboard')} />;
     if (page === 'members') {
       if (subPage === 'memberadmin') return <MemberAdmin onBack={() => setSubPage(null)} />;

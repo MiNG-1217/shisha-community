@@ -20,7 +20,19 @@ const currentUser = auth.currentUser;
 
 const getMemberInfo = (uid) => {
 const member = allMembers.find((m) => m.uid === uid);
-return { nickname: member?.nickname || "", iconUrl: member?.iconUrl || "" };
+return { nickname: member?.nickname || "", iconUrl: member?.iconUrl || "", myEmoji: member?.myEmoji || "" };
+};
+
+const handleReaction = async (msgId, collectionPath) => {
+console.log("userDoc:", userDoc); if (!userDoc?.myEmoji) return;
+const msgRef = doc(db, ...collectionPath, msgId);
+const allMsgs = [...messages, ...dmMessages, ...areaMessages];
+const msg = allMsgs.find((m) => m.id === msgId);
+const reactions = msg?.reactions || [];
+const already = reactions.includes(userDoc.myEmoji);
+await updateDoc(msgRef, {
+reactions: already ? reactions.filter((r) => r !== userDoc.myEmoji) : [...reactions, userDoc.myEmoji]
+});
 };
 
 useEffect(() => {
@@ -131,6 +143,17 @@ await addDoc(collection(db, "dms", dmId, "messages"), { text, createdAt: serverT
 setText("");
 };
 
+const renderReactions = (msg, collectionPath) => {
+const reactions = msg.reactions || [];
+return (
+<div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+{reactions.map((emoji, i) => (
+<span key={i} style={{ fontSize: 18 }}>{emoji}</span>
+))}
+</div>
+);
+};
+
 if (mode === "dm" && selectedMember) {
 return (
 <div style={{ padding: "24px" }}>
@@ -146,7 +169,10 @@ return (
 <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
 {dmMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
 {dmMessages.map((msg) => (
-<div key={msg.id} style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
+<div key={msg.id}
+onDoubleClick={() => handleReaction(msg.id, ["dms", [currentUser.uid, selectedMember.uid].sort().join("*"), "messages"])}
+onContextMenu={(e) => { e.preventDefault(); handleReaction(msg.id, ["dms", [currentUser.uid, selectedMember.uid].sort().join("*"), "messages"]); }}
+style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
 {msg.uid !== currentUser.uid && (
 selectedMember.iconUrl ? (
 <img src={selectedMember.iconUrl} alt="icon" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -158,6 +184,7 @@ selectedMember.iconUrl ? (
 <div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && selectedMember.nickname}</div>
 <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
 {msg.uid === currentUser.uid && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{msg.readBy && msg.readBy.some((uid) => uid !== currentUser.uid) ? "既読" : ""}</div>}
+{renderReactions(msg, ["dms", [currentUser.uid, selectedMember.uid].sort().join("_"), "messages"])}
 </div>
 </div>
 ))}
@@ -178,7 +205,10 @@ return (
 <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
 {areaMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
 {areaMessages.map((msg) => (
-<div key={msg.id} style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
+<div key={msg.id}
+onDoubleClick={() => handleReaction(msg.id, ["areas", selectedArea, "messages"])}
+onContextMenu={(e) => { e.preventDefault(); handleReaction(msg.id, ["areas", selectedArea, "messages"]); }}
+style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
 {msg.uid !== currentUser.uid && (
 getMemberInfo(msg.uid).iconUrl ? (
 <img src={getMemberInfo(msg.uid).iconUrl} alt="icon" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -189,6 +219,7 @@ getMemberInfo(msg.uid).iconUrl ? (
 <div>
 <div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && getMemberInfo(msg.uid).nickname}</div>
 <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
+{renderReactions(msg, ["areas", selectedArea, "messages"])}
 </div>
 </div>
 ))}
@@ -223,7 +254,10 @@ return (
 <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
 {messages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
 {messages.map((msg) => (
-<div key={msg.id} style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
+<div key={msg.id}
+onDoubleClick={() => handleReaction(msg.id, ["messages"])}
+onContextMenu={(e) => { e.preventDefault(); handleReaction(msg.id, ["messages"]); }}
+style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
 {msg.uid !== currentUser.uid && (
 getMemberInfo(msg.uid).iconUrl ? (
 <img src={getMemberInfo(msg.uid).iconUrl} alt="icon" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -234,6 +268,7 @@ getMemberInfo(msg.uid).iconUrl ? (
 <div>
 <div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && getMemberInfo(msg.uid).nickname}</div>
 <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
+{renderReactions(msg, ["messages"])}
 </div>
 </div>
 ))}
