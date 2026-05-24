@@ -22,6 +22,7 @@ function App() {
   const [page, setPage] = useState("dashboard");
   const [subPage, setSubPage] = useState(null);
   const [notices, setNotices] = useState([]);
+  const [chatUnread, setChatUnread] = useState(0);
   const { user, userDoc, isAdmin, loading } = useUser();
 
   const inviteCode = new URLSearchParams(window.location.search).get("invite");
@@ -91,7 +92,6 @@ function App() {
     const d = ts.toDate();
     return (d.getMonth() + 1) + "/" + d.getDate();
   };
-
   const renderPage = () => {
     if (page === 'dashboard') {
       return (
@@ -127,7 +127,7 @@ function App() {
         </div>
       );
     }
-    if (page === 'chat') return <Chat />;
+    if (page === 'chat') return <Chat onUnreadChange={setChatUnread} />;
     if (page === 'events') return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
     if (page === 'invite') return <InviteAdmin onBack={() => setPage('dashboard')} />;
     if (page === 'members') {
@@ -172,11 +172,12 @@ function App() {
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
         {['dashboard', 'chat', 'events', 'members', 'poll', 'invite'].map((p) => (
           (p !== 'invite' || isAdmin) && (
-            <button key={p} onClick={() => { setPage(p); setSubPage(null); }} style={{
+            <button key={p} onClick={() => { setPage(p); setSubPage(null); if (p === 'chat') setChatUnread(0); }} style={{
               padding: '12px 20px',
               backgroundColor: page === p ? '#c9a96e' : 'transparent',
               color: page === p ? '#1a1a2e' : '#888',
               border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 13,
+              position: 'relative',
             }}>
               {p === 'dashboard' ? '🏠 ホーム'
                 : p === 'chat' ? '💬 チャット'
@@ -184,6 +185,11 @@ function App() {
                 : p === 'members' ? '👥 メンバー'
                 : p === 'poll' ? '🗳️ 投票'
                 : '🔗 招待'}
+              {p === 'chat' && chatUnread > 0 && (
+                <span style={{ position: 'absolute', top: 4, right: 4, background: '#ff4444', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {chatUnread}
+                </span>
+              )}
             </button>
           )
         ))}
