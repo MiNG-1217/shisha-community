@@ -172,61 +172,60 @@ return (
 </button>
 </div>
 
-  {mode === "group" && (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <h3 style={{ color: "#c9a96e", margin: 0 }}>💬 メインチャット</h3>
-        <div style={{ display: "flex", gap: 6 }}>
-          {AREAS.map((area) => (
-            <button key={area} onClick={() => { setMode("area"); setSelectedArea(area); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #c9a96e", background: "none", color: "#c9a96e", cursor: "pointer", fontSize: 12 }}>{area}</button>
-          ))}
-        </div>
-      </div>
-      <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
-        {messages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
-        {messages.map((msg) => (
-          <div key={msg.id} style={{ marginBottom: "12px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>
-            <div style={{ color: "#888", fontSize: "12px", marginBottom: "4px" }}>{msg.email}</div>
-            <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: "8px" }}>
-        <input type="text" placeholder="メッセージを入力..." value={text} onChange={(e) => setText(e.target.value)} onKeyPress={(e) => e.key === "Enter" && sendMessage()} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #333", backgroundColor: "#0f3460", color: "white" }} />
-        <button onClick={sendMessage} style={{ padding: "12px 20px", backgroundColor: "#c9a96e", color: "#1a1a2e", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>送信</button>
-      </div>
-    </div>
-  )}
-
-  {mode === "area" && !selectedArea && (
-    <div>
-      <h3 style={{ color: "#c9a96e", marginBottom: 16 }}>🗾 エリアスレッド</h3>
-      {AREAS.map((area) => (
-        <div key={area} onClick={() => setSelectedArea(area)} style={{ backgroundColor: "#16213e", borderRadius: 10, padding: 16, marginBottom: 10, cursor: "pointer", border: "1px solid #333", display: "flex", alignItems: "center", gap: 12 }}>
-          <p style={{ color: "#fff", margin: 0, fontWeight: "bold", fontSize: 16 }}>🗾 {area}</p>
-        </div>
-      ))}
-    </div>
-  )}
-
-  {mode === "dm" && !selectedMember && (
-    <div>
-      <h3 style={{ color: "#c9a96e", marginBottom: 16 }}>✉️ DMする相手を選ぶ</h3>
-      {members.map((member) => (
-        <div key={member.uid} onClick={() => { setSelectedMember(member); markDmRead(member); }} style={{ backgroundColor: "#16213e", borderRadius: 10, padding: 16, marginBottom: 10, cursor: "pointer", border: "1px solid #333", display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
-          {member.iconUrl ? (
-            <img src={member.iconUrl} alt="icon" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
-          ) : (
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#c9a96e", color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 18 }}>{member.nickname?.[0] || "?"}</div>
-          )}
-          <p style={{ color: "#fff", margin: 0, fontWeight: "bold" }}>{member.nickname}</p>
-          {unreadDm[member.uid] > 0 && <span style={{ marginLeft: "auto", background: "#ff4444", color: "white", borderRadius: "50%", width: 22, height: 22, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadDm[member.uid]}</span>}
-        </div>
-      ))}
-    </div>
-  )}
+{mode === "group" && (
+<div>
+<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+<h3 style={{ color: "#c9a96e", margin: 0 }}>💬 メインチャット</h3>
+<div style={{ display: "flex", gap: 6 }}>
+{AREAS.map((area) => (
+<button key={area} onClick={() => { setMode("area"); setSelectedArea(area); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #c9a96e", background: "none", color: "#c9a96e", cursor: "pointer", fontSize: 12 }}>{area}</button>
+))}
 </div>
+</div>
+<div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
+{messages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
+{messages.map((msg) => (
+<div key={[msg.id](http://msg.id/)} style={{ marginBottom: "12px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>
+<div style={{ color: "#888", fontSize: "12px", marginBottom: "4px" }}>{msg.email}</div>
+<div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>
+</div>
+))}
+</div>
+<div style={{ display: "flex", gap: "8px" }}>
+<input type="text" placeholder="メッセージを入力..." value={text} onChange={(e) => setText(e.target.value)} onKeyPress={(e) => e.key === "Enter" && sendMessage()} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #333", backgroundColor: "#0f3460", color: "white" }} />
+<button onClick={sendMessage} style={{ padding: "12px 20px", backgroundColor: "#c9a96e", color: "#1a1a2e", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>送信</button>
+</div>
+</div>
+)}
 
+{mode === "area" && !selectedArea && (
+<div>
+<h3 style={{ color: "#c9a96e", marginBottom: 16 }}>🗾 エリアスレッド</h3>
+{AREAS.map((area) => (
+<div key={area} onClick={() => setSelectedArea(area)} style={{ backgroundColor: "#16213e", borderRadius: 10, padding: 16, marginBottom: 10, cursor: "pointer", border: "1px solid #333", display: "flex", alignItems: "center", gap: 12 }}>
+<p style={{ color: "#fff", margin: 0, fontWeight: "bold", fontSize: 16 }}>🗾 {area}</p>
+</div>
+))}
+</div>
+)}
+
+{mode === "dm" && !selectedMember && (
+<div>
+<h3 style={{ color: "#c9a96e", marginBottom: 16 }}>✉️ DMする相手を選ぶ</h3>
+{members.map((member) => (
+<div key={member.uid} onClick={() => { setSelectedMember(member); markDmRead(member); }} style={{ backgroundColor: "#16213e", borderRadius: 10, padding: 16, marginBottom: 10, cursor: "pointer", border: "1px solid #333", display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
+{member.iconUrl ? (
+<img src={member.iconUrl} alt="icon" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
+) : (
+<div style={{ width: 44, height: 44, borderRadius: "50%", background: "#c9a96e", color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 18 }}>{member.nickname?.[0] || "?"}</div>
+)}
+<p style={{ color: "#fff", margin: 0, fontWeight: "bold" }}>{member.nickname}</p>
+{unreadDm[member.uid] > 0 && <span style={{ marginLeft: "auto", background: "#ff4444", color: "white", borderRadius: "50%", width: 22, height: 22, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadDm[member.uid]}</span>}
+</div>
+))}
+</div>
+)}
+</div>
 );
 }
 
