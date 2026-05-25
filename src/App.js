@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where, doc, updateDoc } from "firebase/firestore";
 import { useUser } from "./hooks/useUser";
 import Chat from "./Chat";
 import PollCreate from "./PollCreate";
@@ -16,6 +16,7 @@ import MemberAdmin from "./MemberAdmin";
 import Notices from "./Notices";
 import Contact from "./Contact";
 import DataAdmin from "./DataAdmin";
+import { requestNotificationPermission } from "./firebase-messaging";
 
 function App() {
 const [email, setEmail] = useState("");
@@ -33,6 +34,16 @@ const { user, userDoc, isAdmin, loading } = useUser();
 const inviteCode = new URLSearchParams(window.location.search).get("invite");
 
 useEffect(() => {
+if (user && userDoc) {
+requestNotificationPermission().then((token) => {
+if (token) {
+updateDoc(doc(db, "users", user.uid), { fcmToken: token });
+}
+});
+}
+}, [user, userDoc]);
+
+useEffect(() => {
 const handleResize = () => setIsMobile(window.innerWidth <= 768);
 window.addEventListener("resize", handleResize);
 return () => window.removeEventListener("resize", handleResize);
@@ -42,7 +53,7 @@ useEffect(() => {
 if (!user) return;
 const q = query(collection(db, "notices"), orderBy("createdAt", "desc"));
 const unsub = onSnapshot(q, (snap) => {
-setNotices(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+setNotices(snap.docs.map((d) => ({ id: d["id"], ...d.data() })));
 });
 return () => unsub();
 }, [user]);
@@ -56,7 +67,7 @@ where("date", ">=", today),
 orderBy("date", "asc")
 );
 const unsub = onSnapshot(q, (snap) => {
-const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+const list = snap.docs.map((d) => ({ id: d["id"], ...d.data() }));
 setUpcomingEvent(list.length > 0 ? list[0] : null);
 });
 return () => unsub();
@@ -75,9 +86,9 @@ const unsubList = sources.map(({ col, icon, label }, idx) => {
 const q = query(collection(db, col), orderBy("createdAt", "desc"));
 return onSnapshot(q, (snap) => {
 const items = snap.docs.map((d) => ({
-id: col + d.id,
+id: col + d["id"],
 icon,
-text: label({ id: d.id, ...d.data() }),
+text: label({ id: d["id"], ...d.data() }),
 createdAt: d.data().createdAt,
 }));
 all[idx] = items;
@@ -163,7 +174,7 @@ const TAB_ITEMS = [
 { key: 'poll', label: '🗳️', fullLabel: '🗳️ 投票' },
 { key: 'contact', label: '📮', fullLabel: '📮 要望' },
 ...(isAdmin ? [{ key: 'invite', label: '🔗', fullLabel: '🔗 招待' }] : []),
-...(isAdmin ? [{ key: 'dataadmin', label: '🗑', fullLabel: '🗑️ 管理' }] : []),
+...(isAdmin ? [{ key: 'dataadmin', label: '🗑️', fullLabel: '🗑️ 管理' }] : []),
 ];
 
 const renderPage = () => {
@@ -187,7 +198,7 @@ onClick={() => setSubPage('noticepost')}>投稿</button>
 <p style={{ color: '#888' }}>新着なし</p>
 ) : (
 notices.slice(0, 3).map((n) => (
-<div key={n.id} style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '16px', marginBottom: 10, border: '1px solid #333' }}>
+<div key={n["id"]} style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '16px', marginBottom: 10, border: '1px solid #333' }}>
 <p style={{ color: '#fff', margin: '0 0 6px', fontSize: 14, lineHeight: 1.6 }}>{n.text}</p>
 <p style={{ color: '#888', margin: 0, fontSize: 12 }}>{formatDate(n.createdAt)}</p>
 </div>
@@ -212,7 +223,7 @@ onClick={() => setPage('events')}>
 <p style={{ color: '#888' }}>アクティビティはありません</p>
 ) : (
 activities.map((a) => (
-<div key={a.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid #222' }}>
+<div key={a["id"]} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid #222' }}>
 <span style={{ fontSize: 18 }}>{a.icon}</span>
 <div>
 <p style={{ color: '#ccc', margin: 0, fontSize: 14 }}>{a.text}</p>
@@ -274,7 +285,6 @@ return (
 </div>
 
 
-  {/* PCナビ */}
   {!isMobile && (
     <div style={{ display: 'flex', borderBottom: '1px solid #333' }}>
       {TAB_ITEMS.map((t) => (
@@ -296,10 +306,8 @@ return (
     </div>
   )}
 
-  {/* コンテンツ */}
   {renderPage()}
 
-  {/* スマホ下部タブバー */}
   {isMobile && (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#16213e', borderTop: '1px solid #333', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '8px 0', zIndex: 100 }}>
       {TAB_ITEMS.map((t) => (
