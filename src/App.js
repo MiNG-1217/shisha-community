@@ -27,9 +27,16 @@ const [notices, setNotices] = useState([]);
 const [chatUnread, setChatUnread] = useState(0);
 const [upcomingEvent, setUpcomingEvent] = useState(null);
 const [activities, setActivities] = useState([]);
+const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 const { user, userDoc, isAdmin, loading } = useUser();
 
 const inviteCode = new URLSearchParams(window.location.search).get("invite");
+
+useEffect(() => {
+const handleResize = () => setIsMobile(window.innerWidth <= 768);
+window.addEventListener("resize", handleResize);
+return () => window.removeEventListener("resize", handleResize);
+}, []);
 
 useEffect(() => {
 if (!user) return;
@@ -148,6 +155,17 @@ const d = ts.toDate();
 return (d.getMonth() + 1) + "/" + d.getDate();
 };
 
+const TAB_ITEMS = [
+{ key: 'dashboard', label: '🏠', fullLabel: '🏠 ホーム' },
+{ key: 'chat', label: '💬', fullLabel: '💬 チャット' },
+{ key: 'events', label: '📅', fullLabel: '📅 イベント' },
+{ key: 'members', label: '👥', fullLabel: '👥 メンバー' },
+{ key: 'poll', label: '🗳️', fullLabel: '🗳️ 投票' },
+{ key: 'contact', label: '📮', fullLabel: '📮 要望' },
+...(isAdmin ? [{ key: 'invite', label: '🔗', fullLabel: '🔗 招待' }] : []),
+...(isAdmin ? [{ key: 'dataadmin', label: '🗑', fullLabel: '🗑️ 管理' }] : []),
+];
+
 const renderPage = () => {
 if (page === 'dashboard') {
 return (
@@ -208,7 +226,7 @@ activities.map((a) => (
 }
 
 
-if (page === 'chat') return <Chat onUnreadChange={setChatUnread} userDoc={userDoc} />;
+if (page === 'chat') return <Chat onUnreadChange={setChatUnread} userDoc={userDoc} isMobile={isMobile} />;
 if (page === 'events') return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
 if (page === 'contact') return <Contact userDoc={userDoc} isAdmin={isAdmin} />;
 if (page === 'dataadmin') return <DataAdmin />;
@@ -246,43 +264,65 @@ if (page === 'poll') {
 };
 
 return (
-<div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', color: 'white' }}>
-<div style={{ backgroundColor: '#16213e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<h2 style={{ color: '#c9a96e', margin: 0 }}>🌿 Shisha Community</h2>
-<div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-{isAdmin && <span style={{ color: '#c9a96e', fontSize: 12, border: '1px solid #c9a96e', borderRadius: 6, padding: '2px 8px' }}>管理人</span>}
-<button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>ログアウト</button>
+<div style={{ minHeight: '100vh', backgroundColor: '#1a1a2e', color: 'white', paddingBottom: isMobile ? 70 : 0 }}>
+<div style={{ backgroundColor: '#16213e', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+<h2 style={{ color: '#c9a96e', margin: 0, fontSize: isMobile ? 16 : 20 }}>🌿 Shisha Community</h2>
+<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+{isAdmin && <span style={{ color: '#c9a96e', fontSize: 11, border: '1px solid #c9a96e', borderRadius: 6, padding: '2px 6px' }}>管理人</span>}
+<button onClick={handleLogout} style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #444', borderRadius: '8px', padding: isMobile ? '6px 10px' : '8px 16px', cursor: 'pointer', fontSize: isMobile ? 12 : 14 }}>ログアウト</button>
 </div>
 </div>
-<div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
-{['dashboard', 'chat', 'events', 'members', 'poll', 'contact', 'invite', 'dataadmin'].map((p) => (
-(p !== 'invite' || isAdmin) && (p !== 'dataadmin' || isAdmin) && (
-<button key={p} onClick={() => { setPage(p); setSubPage(null); if (p === 'chat') setChatUnread(0); }} style={{
-padding: '12px 20px',
-backgroundColor: page === p ? '#c9a96e' : 'transparent',
-color: page === p ? '#1a1a2e' : '#888',
-border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 13,
-position: 'relative',
-}}>
-{p === 'dashboard' ? '🏠 ホーム'
-: p === 'chat' ? '💬 チャット'
-: p === 'events' ? '📅 イベント'
-: p === 'members' ? '👥 メンバー'
-: p === 'poll' ? '🗳️ 投票'
-: p === 'contact' ? '📮 要望'
-: p === 'dataadmin' ? '🗑️ 管理'
-: '🔗 招待'}
-{p === 'chat' && chatUnread > 0 && (
-<span style={{ position: 'absolute', top: 4, right: 4, background: '#ff4444', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-{chatUnread}
-</span>
-)}
-</button>
-)
-))}
+
+
+  {/* PCナビ */}
+  {!isMobile && (
+    <div style={{ display: 'flex', borderBottom: '1px solid #333' }}>
+      {TAB_ITEMS.map((t) => (
+        <button key={t.key} onClick={() => { setPage(t.key); setSubPage(null); if (t.key === 'chat') setChatUnread(0); }} style={{
+          padding: '12px 20px',
+          backgroundColor: page === t.key ? '#c9a96e' : 'transparent',
+          color: page === t.key ? '#1a1a2e' : '#888',
+          border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 13,
+          position: 'relative',
+        }}>
+          {t.fullLabel}
+          {t.key === 'chat' && chatUnread > 0 && (
+            <span style={{ position: 'absolute', top: 4, right: 4, background: '#ff4444', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {chatUnread}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  )}
+
+  {/* コンテンツ */}
+  {renderPage()}
+
+  {/* スマホ下部タブバー */}
+  {isMobile && (
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#16213e', borderTop: '1px solid #333', display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '8px 0', zIndex: 100 }}>
+      {TAB_ITEMS.map((t) => (
+        <button key={t.key} onClick={() => { setPage(t.key); setSubPage(null); if (t.key === 'chat') setChatUnread(0); }} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+          color: page === t.key ? '#c9a96e' : '#555',
+          position: 'relative', padding: '4px 8px',
+          fontSize: 10, fontWeight: 'bold',
+        }}>
+          <span style={{ fontSize: 22 }}>{t.label}</span>
+          {t.key === 'chat' && chatUnread > 0 && (
+            <span style={{ position: 'absolute', top: 0, right: 2, background: '#ff4444', color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {chatUnread}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  )}
 </div>
-{renderPage()}
-</div>
+
+
 );
 }
 

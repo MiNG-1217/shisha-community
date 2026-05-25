@@ -5,7 +5,8 @@ import { collection, addDoc, onSnapshot, orderBy, query, serverTimestamp, update
 const AREAS = ["関西", "東海", "東北", "北海道", "九州"];
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}`;
 const CLOUDINARY_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
-function Chat({ onUnreadChange, userDoc }) {
+
+function Chat({ onUnreadChange, userDoc, isMobile }) {
 const [mode, setMode] = useState("group");
 const [messages, setMessages] = useState([]);
 const [dmMessages, setDmMessages] = useState([]);
@@ -19,7 +20,12 @@ const [unreadGroup, setUnreadGroup] = useState(0);
 const [unreadDm, setUnreadDm] = useState({});
 const [uploading, setUploading] = useState(false);
 const fileInputRef = useRef(null);
+const messagesEndRef = useRef(null);
 const currentUser = auth.currentUser;
+
+useEffect(() => {
+messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [messages, dmMessages, areaMessages]);
 
 const getMemberInfo = (uid) => {
 const member = allMembers.find((m) => m.uid === uid);
@@ -30,7 +36,7 @@ const handleReaction = async (msgId, collectionPath) => {
 if (!userDoc?.myEmoji) return;
 const msgRef = doc(db, ...collectionPath, msgId);
 const allMsgs = [...messages, ...dmMessages, ...areaMessages];
-const msg = allMsgs.find((m) => m.id === msgId);
+const msg = allMsgs.find((m) => m["id"] === msgId);
 const reactions = msg?.reactions || [];
 const already = reactions.includes(userDoc.myEmoji);
 await updateDoc(msgRef, {
@@ -74,14 +80,14 @@ return () => unsub();
 useEffect(() => {
 const q = query(collection(db, "messages"), orderBy("createdAt"));
 const unsub = onSnapshot(q, (snapshot) => {
-const msgs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+const msgs = snapshot.docs.map((d) => ({ id: d["id"], ...d.data() }));
 setMessages(msgs);
 const unread = msgs.filter((m) => m.uid !== currentUser.uid && !m.readBy?.includes(currentUser.uid)).length;
 setUnreadGroup(unread);
 if (mode === "group") {
 msgs.forEach(async (msg) => {
 if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
-await updateDoc(doc(db, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
+await updateDoc(doc(db, "messages", msg["id"]), { readBy: [...(msg.readBy || []), currentUser.uid] });
 }
 });
 }
@@ -93,7 +99,7 @@ useEffect(() => {
 if (!selectedArea) return;
 const q = query(collection(db, "areas", selectedArea, "messages"), orderBy("createdAt"));
 const unsub = onSnapshot(q, (snapshot) => {
-setAreaMessages(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+setAreaMessages(snapshot.docs.map((d) => ({ id: d["id"], ...d.data() })));
 });
 return () => unsub();
 }, [selectedArea]);
@@ -103,7 +109,7 @@ members.forEach((member) => {
 const dmId = [currentUser.uid, member.uid].sort().join("_");
 const q = query(collection(db, "dms", dmId, "messages"), orderBy("createdAt"));
 onSnapshot(q, (snapshot) => {
-const msgs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+const msgs = snapshot.docs.map((d) => ({ id: d["id"], ...d.data() }));
 const unread = msgs.filter((m) => m.uid !== currentUser.uid && !m.readBy?.includes(currentUser.uid)).length;
 setUnreadDm((prev) => ({ ...prev, [member.uid]: unread }));
 });
@@ -120,11 +126,11 @@ if (!selectedMember) return;
 const dmId = [currentUser.uid, selectedMember.uid].sort().join("_");
 const q = query(collection(db, "dms", dmId, "messages"), orderBy("createdAt"));
 const unsub = onSnapshot(q, (snapshot) => {
-const msgs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+const msgs = snapshot.docs.map((d) => ({ id: d["id"], ...d.data() }));
 setDmMessages(msgs);
 msgs.forEach(async (msg) => {
 if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
-await updateDoc(doc(db, "dms", dmId, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
+await updateDoc(doc(db, "dms", dmId, "messages", msg["id"]), { readBy: [...(msg.readBy || []), currentUser.uid] });
 }
 });
 setUnreadDm((prev) => {
@@ -140,7 +146,7 @@ return () => unsub();
 const markGroupRead = () => {
 messages.forEach(async (msg) => {
 if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
-await updateDoc(doc(db, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
+await updateDoc(doc(db, "messages", msg["id"]), { readBy: [...(msg.readBy || []), currentUser.uid] });
 }
 });
 setUnreadGroup(0);
@@ -150,7 +156,7 @@ const markDmRead = (member) => {
 const dmId = [currentUser.uid, member.uid].sort().join("_");
 dmMessages.forEach(async (msg) => {
 if (msg.uid !== currentUser.uid && !msg.readBy?.includes(currentUser.uid)) {
-await updateDoc(doc(db, "dms", dmId, "messages", msg.id), { readBy: [...(msg.readBy || []), currentUser.uid] });
+await updateDoc(doc(db, "dms", dmId, "messages", msg["id"]), { readBy: [...(msg.readBy || []), currentUser.uid] });
 }
 });
 setUnreadDm((prev) => ({ ...prev, [member.uid]: 0 }));
@@ -194,7 +200,7 @@ onClick={() => window.open(msg.mediaUrl, "_blank")} />
 );
 };
 
-const renderReactions = (msg, collectionPath) => {
+const renderReactions = (msg) => {
 const reactions = msg.reactions || [];
 return (
 <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
@@ -221,11 +227,13 @@ style={{ padding: "12px 20px", backgroundColor: "#c9a96e", color: "#1a1a2e", bor
 </div>
 );
 
+const msgAreaHeight = isMobile ? "calc(100vh - 280px)" : "400px";
+
 if (mode === "dm" && selectedMember) {
 return (
-<div style={{ padding: "24px" }}>
-<button onClick={() => { setMode("dm"); setSelectedMember(null); }} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>← 戻る</button>
-<h3 style={{ color: "#c9a96e", marginBottom: 16 }}>
+<div style={{ padding: "16px" }}>
+<button onClick={() => { setMode("dm"); setSelectedMember(null); }} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14, marginBottom: 8 }}>← 戻る</button>
+<h3 style={{ color: "#c9a96e", marginBottom: 12, fontSize: 15 }}>
 {selectedMember.iconUrl ? (
 <img src={selectedMember.iconUrl} alt="icon" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", marginRight: 8, verticalAlign: "middle" }} />
 ) : (
@@ -233,12 +241,12 @@ return (
 )}
 {selectedMember.nickname} へのDM
 </h3>
-<div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
-{dmMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
+<div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: msgAreaHeight, overflowY: "scroll", marginBottom: "16px" }}>
+{dmMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "40px" }}>まだメッセージがありません</p>}
 {dmMessages.map((msg) => (
-<div key={msg.id}
-onDoubleClick={() => handleReaction(msg.id, ["dms", [currentUser.uid, selectedMember.uid].sort().join("*"), "messages"])}
-onContextMenu={(e) => { e.preventDefault(); handleReaction(msg.id, ["dms", [currentUser.uid, selectedMember.uid].sort().join("*"), "messages"]); }}
+<div key={msg["id"]}
+onDoubleClick={() => handleReaction(msg["id"], ["dms", [currentUser.uid, selectedMember.uid].sort().join("*"), "messages"])}
+onContextMenu={(e) => { e.preventDefault(); handleReaction(msg["id"], ["dms", [currentUser.uid, selectedMember.uid].sort().join("*"), "messages"]); }}
 style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
 {msg.uid !== currentUser.uid && (
 selectedMember.iconUrl ? (
@@ -252,10 +260,11 @@ selectedMember.iconUrl ? (
 {msg.text && <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>}
 {renderMedia(msg)}
 {msg.uid === currentUser.uid && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{msg.readBy && msg.readBy.some((uid) => uid !== currentUser.uid) ? "既読" : ""}</div>}
-{renderReactions(msg, ["dms", [currentUser.uid, selectedMember.uid].sort().join("_"), "messages"])}
+{renderReactions(msg)}
 </div>
 </div>
 ))}
+<div ref={messagesEndRef} />
 </div>
 {renderInput()}
 </div>
@@ -264,15 +273,15 @@ selectedMember.iconUrl ? (
 
 if (mode === "area" && selectedArea) {
 return (
-<div style={{ padding: "24px" }}>
-<button onClick={() => setSelectedArea(null)} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>← 戻る</button>
-<h3 style={{ color: "#c9a96e", marginBottom: 16 }}>🗾 {selectedArea}スレッド</h3>
-<div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
-{areaMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
+<div style={{ padding: "16px" }}>
+<button onClick={() => setSelectedArea(null)} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14, marginBottom: 8 }}>← 戻る</button>
+<h3 style={{ color: "#c9a96e", marginBottom: 12, fontSize: 15 }}>🗾 {selectedArea}スレッド</h3>
+<div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: msgAreaHeight, overflowY: "scroll", marginBottom: "16px" }}>
+{areaMessages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "40px" }}>まだメッセージがありません</p>}
 {areaMessages.map((msg) => (
-<div key={msg.id}
-onDoubleClick={() => handleReaction(msg.id, ["areas", selectedArea, "messages"])}
-onContextMenu={(e) => { e.preventDefault(); handleReaction(msg.id, ["areas", selectedArea, "messages"]); }}
+<div key={msg["id"]}
+onDoubleClick={() => handleReaction(msg["id"], ["areas", selectedArea, "messages"])}
+onContextMenu={(e) => { e.preventDefault(); handleReaction(msg["id"], ["areas", selectedArea, "messages"]); }}
 style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
 {msg.uid !== currentUser.uid && (
 getMemberInfo(msg.uid).iconUrl ? (
@@ -285,10 +294,11 @@ getMemberInfo(msg.uid).iconUrl ? (
 <div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && getMemberInfo(msg.uid).nickname}</div>
 {msg.text && <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>}
 {renderMedia(msg)}
-{renderReactions(msg, ["areas", selectedArea, "messages"])}
+{renderReactions(msg)}
 </div>
 </div>
 ))}
+<div ref={messagesEndRef} />
 </div>
 {renderInput()}
 </div>
@@ -296,8 +306,8 @@ getMemberInfo(msg.uid).iconUrl ? (
 }
 
 return (
-<div style={{ padding: "24px" }}>
-<div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+<div style={{ padding: "16px" }}>
+<div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
 <button onClick={() => { setMode("group"); markGroupRead(); }} style={{ padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: "bold", position: "relative", backgroundColor: mode === "group" ? "#c9a96e" : "#16213e", color: mode === "group" ? "#1a1a2e" : "#888" }}>
 💬 メイン
 {unreadGroup > 0 && <span style={{ position: "absolute", top: -6, right: -6, background: "#ff4444", color: "white", borderRadius: "50%", width: 18, height: 18, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadGroup}</span>}
@@ -308,18 +318,19 @@ return (
 </button>
 </div>
 
+
   {mode === "group" && (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-        <h3 style={{ color: "#c9a96e", margin: 0 }}>💬 メインチャット</h3>
+        <h3 style={{ color: "#c9a96e", margin: 0, fontSize: 15 }}>💬 メインチャット</h3>
         <button onClick={() => setMode("area")} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #c9a96e", background: "none", color: "#c9a96e", cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🗾 エリア</button>
       </div>
-      <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: "400px", overflowY: "scroll", marginBottom: "16px" }}>
-        {messages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "160px" }}>まだメッセージがありません</p>}
+      <div style={{ backgroundColor: "#0f3460", borderRadius: "12px", padding: "16px", height: msgAreaHeight, overflowY: "scroll", marginBottom: "16px" }}>
+        {messages.length === 0 && <p style={{ color: "#888", textAlign: "center", marginTop: "40px" }}>まだメッセージがありません</p>}
         {messages.map((msg) => (
-          <div key={msg.id}
-            onDoubleClick={() => handleReaction(msg.id, ["messages"])}
-            onContextMenu={(e) => { e.preventDefault(); handleReaction(msg.id, ["messages"]); }}
+          <div key={msg["id"]}
+            onDoubleClick={() => handleReaction(msg["id"], ["messages"])}
+            onContextMenu={(e) => { e.preventDefault(); handleReaction(msg["id"], ["messages"]); }}
             style={{ marginBottom: "12px", display: "flex", flexDirection: msg.uid === currentUser.uid ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}>
             {msg.uid !== currentUser.uid && (
               getMemberInfo(msg.uid).iconUrl ? (
@@ -332,14 +343,17 @@ return (
               <div style={{ color: "#888", fontSize: "12px", marginBottom: "4px", textAlign: msg.uid === currentUser.uid ? "right" : "left" }}>{msg.uid !== currentUser.uid && getMemberInfo(msg.uid).nickname}</div>
               {msg.text && <div style={{ display: "inline-block", backgroundColor: msg.uid === currentUser.uid ? "#c9a96e" : "#16213e", color: msg.uid === currentUser.uid ? "#1a1a2e" : "white", padding: "8px 12px", borderRadius: "12px", maxWidth: "70%" }}>{msg.text}</div>}
               {renderMedia(msg)}
-              {renderReactions(msg, ["messages"])}
+              {renderReactions(msg)}
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
       {renderInput()}
     </div>
   )}
+
+
 
   {mode === "area" && !selectedArea && (
     <div>
@@ -369,6 +383,7 @@ return (
     </div>
   )}
 </div>
+
 
 );
 }
