@@ -15,6 +15,7 @@ import ProfileList from "./ProfileList";
 import MemberAdmin from "./MemberAdmin";
 import Notices from "./Notices";
 import Contact from "./Contact";
+import DataAdmin from "./DataAdmin";
 
 function App() {
 const [email, setEmail] = useState("");
@@ -178,10 +179,8 @@ notices.slice(0, 3).map((n) => (
 )}
 <h3 style={{ color: '#c9a96e', margin: '0 0 12px' }}>📅 直近イベント</h3>
 {upcomingEvent ? (
-<div
-style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '16px', marginBottom: 24, border: '1px solid #c9a96e', cursor: 'pointer' }}
-onClick={() => setPage('events')}
->
+<div style={{ backgroundColor: '#16213e', borderRadius: '12px', padding: '16px', marginBottom: 24, border: '1px solid #c9a96e', cursor: 'pointer' }}
+onClick={() => setPage('events')}>
 <p style={{ color: '#fff', fontWeight: 'bold', margin: '0 0 6px', fontSize: 15 }}>{upcomingEvent.title}</p>
 <p style={{ color: '#c9a96e', margin: '0 0 4px', fontSize: 13 }}>📅 {upcomingEvent.date}{upcomingEvent.time ? ' ' + upcomingEvent.time : ''}</p>
 {upcomingEvent.location && <p style={{ color: '#aaa', margin: 0, fontSize: 13 }}>📍 {upcomingEvent.location}</p>}
@@ -208,9 +207,11 @@ activities.map((a) => (
 );
 }
 
+
 if (page === 'chat') return <Chat onUnreadChange={setChatUnread} userDoc={userDoc} />;
 if (page === 'events') return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
 if (page === 'contact') return <Contact userDoc={userDoc} isAdmin={isAdmin} />;
+if (page === 'dataadmin') return <DataAdmin />;
 if (page === 'invite') return <InviteAdmin onBack={() => setPage('dashboard')} />;
 if (page === 'members') {
   if (subPage === 'memberadmin') return <MemberAdmin onBack={() => setSubPage(null)} />;
@@ -241,6 +242,7 @@ if (page === 'poll') {
   );
 }
 
+
 };
 
 return (
@@ -253,8 +255,8 @@ return (
 </div>
 </div>
 <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
-{['dashboard', 'chat', 'events', 'members', 'poll', 'contact', 'invite'].map((p) => (
-(p !== 'invite' || isAdmin) && (
+{['dashboard', 'chat', 'events', 'members', 'poll', 'contact', 'invite', 'dataadmin'].map((p) => (
+(p !== 'invite' || isAdmin) && (p !== 'dataadmin' || isAdmin) && (
 <button key={p} onClick={() => { setPage(p); setSubPage(null); if (p === 'chat') setChatUnread(0); }} style={{
 padding: '12px 20px',
 backgroundColor: page === p ? '#c9a96e' : 'transparent',
@@ -268,6 +270,7 @@ position: 'relative',
 : p === 'members' ? '👥 メンバー'
 : p === 'poll' ? '🗳️ 投票'
 : p === 'contact' ? '📮 要望'
+: p === 'dataadmin' ? '🗑️ 管理'
 : '🔗 招待'}
 {p === 'chat' && chatUnread > 0 && (
 <span style={{ position: 'absolute', top: 4, right: 4, background: '#ff4444', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
