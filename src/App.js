@@ -14,6 +14,7 @@ import ProfileSetup from "./ProfileSetup";
 import ProfileList from "./ProfileList";
 import MemberAdmin from "./MemberAdmin";
 import Notices from "./Notices";
+import Contact from "./Contact";
 
 function App() {
 const [email, setEmail] = useState("");
@@ -209,6 +210,7 @@ activities.map((a) => (
 
 if (page === 'chat') return <Chat onUnreadChange={setChatUnread} userDoc={userDoc} />;
 if (page === 'events') return <EventList userDoc={userDoc} isAdmin={isAdmin} onBack={() => setPage('dashboard')} />;
+if (page === 'contact') return <Contact userDoc={userDoc} isAdmin={isAdmin} />;
 if (page === 'invite') return <InviteAdmin onBack={() => setPage('dashboard')} />;
 if (page === 'members') {
   if (subPage === 'memberadmin') return <MemberAdmin onBack={() => setSubPage(null)} />;
@@ -251,7 +253,7 @@ return (
 </div>
 </div>
 <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #333', flexWrap: 'wrap' }}>
-{['dashboard', 'chat', 'events', 'members', 'poll', 'invite'].map((p) => (
+{['dashboard', 'chat', 'events', 'members', 'poll', 'contact', 'invite'].map((p) => (
 (p !== 'invite' || isAdmin) && (
 <button key={p} onClick={() => { setPage(p); setSubPage(null); if (p === 'chat') setChatUnread(0); }} style={{
 padding: '12px 20px',
@@ -265,6 +267,7 @@ position: 'relative',
 : p === 'events' ? '📅 イベント'
 : p === 'members' ? '👥 メンバー'
 : p === 'poll' ? '🗳️ 投票'
+: p === 'contact' ? '📮 要望'
 : '🔗 招待'}
 {p === 'chat' && chatUnread > 0 && (
 <span style={{ position: 'absolute', top: 4, right: 4, background: '#ff4444', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
